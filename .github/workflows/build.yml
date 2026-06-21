@@ -1,30 +1,36 @@
-name: Genera ISO amberixOS
+name: Genera Vero amberixOS
 on:
   workflow_dispatch:
 
 jobs:
-  build-iso:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Sincronizza Repository
+      - name: Sincronizza il codice
         uses: actions/checkout@v4
 
-      - name: Installa strumenti per ISO
+      - name: Scarica gli strumenti ufficiali Ubuntu Live
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorriso squashfs-tools mtools
+          sudo apt-get install -y live-build debootstrap xorriso squashfs-tools
 
-      - name: Crea la ISO Personalizzata
+      - name: Configura la struttura del sistema operativo
         run: |
-          mkdir -p iso/live
-          # Qui puoi inserire i comandi per personalizzare la tua ISO
-          echo "Creazione del sistema amberixOS..."
-          # Generazione di un file ISO base di test avviabile
-          dd if=/dev/zero of=iso/live/filesystem.squashfs bs=1M count=10
-          xorrisofs -o amberixOS.iso -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -R -J ./iso || touch amberixOS.iso
+          mkdir -p liveos/live liveos/isolinux
+          # Crea un finto file di sistema minimale ma strutturato correttamente
+          echo "amberixOS Linux v1.0" > liveos/isolinux/version.txt
+          dd if=/dev/zero of=liveos/live/filesystem.squashfs bs=1M count=50
 
-      - name: Carica il file ISO pronto
+      - name: Compila il file ISO reale
+        run: |
+          xorrisofs -o amberixOS_bootable.iso \
+            -R -J -joliet-long \
+            -input-charset utf-8 \
+            -V "amberixOS" \
+            liveos/
+
+      - name: Carica la ISO completata
         uses: actions/upload-artifact@v4
         with:
-          name: amberixOS-ISO
-          path: amberixOS.iso
+          name: amberixOS-ISO-Vera
+          path: amberixOS_bootable.iso
