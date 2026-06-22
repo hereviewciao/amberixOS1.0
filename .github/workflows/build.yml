@@ -1,4 +1,4 @@
-name: Genera Vero amberixOS
+name: Genera ISO Kiosk Reale
 on:
   workflow_dispatch:
 
@@ -9,28 +9,33 @@ jobs:
       - name: Sincronizza il codice
         uses: actions/checkout@v4
 
-      - name: Scarica gli strumenti ufficiali Ubuntu Live
+      - name: Installa strumenti di creazione ISO
         run: |
           sudo apt-get update
-          sudo apt-get install -y live-build debootstrap xorriso squashfs-tools
+          sudo apt-get install -y live-build xorriso squashfs-tools
 
-      - name: Configura la struttura del sistema operativo
+      - name: Configura il Sistema Kiosk Debian
         run: |
-          mkdir -p liveos/live liveos/isolinux
-          # Crea un finto file di sistema minimale ma strutturato correttamente
-          echo "amberixOS Linux v1.0" > liveos/isolinux/version.txt
-          dd if=/dev/zero of=liveos/live/filesystem.squashfs bs=1M count=50
+          mkdir -p debian-live/config/package-lists
+          mkdir -p debian-live/config/includes.chroot/etc/xdg/openbox
+          cd debian-live
+          lb config --architectures amd64 --binary-images iso-hybrid
+          
+          # Installa il server grafico minimo e il browser
+          echo "xorg openbox chromium-browser" > config/package-lists/kiosk.list.chroot
+          
+          # Configura l'avvio automatico del browser a tutto schermo sul tuo sito EdgeOne
+          # !!! SOSTITUISCI L'INDIRIZZO SOTTO CON IL LINK DEL TUO SITO EDGEONE !!!
+          echo "chromium-browser --kiosk --no-first-run 'https://amberixos1.edgeone.app/'" > config/includes.chroot/etc/xdg/openbox/autostart
+          chmod +x config/includes.chroot/etc/xdg/openbox/autostart
 
-      - name: Compila il file ISO reale
+      - name: Compila la vera ISO nel Cloud
         run: |
-          xorrisofs -o amberixOS_bootable.iso \
-            -R -J -joliet-long \
-            -input-charset utf-8 \
-            -V "amberixOS" \
-            liveos/
+          cd debian-live
+          sudo lb build
 
-      - name: Carica la ISO completata
+      - name: Carica la ISO completata su GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: amberixOS-ISO-Vera
-          path: amberixOS_bootable.iso
+          name: amberixOS-Kiosk-Funzionante
+          path: debian-live/*.iso
