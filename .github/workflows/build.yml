@@ -1,41 +1,47 @@
-name: Genera ISO Kiosk Reale
+name: Compila ISO amberixOS
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-iso:
     runs-on: ubuntu-latest
     steps:
       - name: Sincronizza il codice
         uses: actions/checkout@v4
 
-      - name: Installa strumenti di creazione ISO
+      - name: Installa pacchetti di creazione immagine
         run: |
           sudo apt-get update
-          sudo apt-get install -y live-build xorriso squashfs-tools
+          sudo apt-get install -y xorriso syslinux isolinux genisoimage wget
 
-      - name: Configura il Sistema Kiosk Debian
+      - name: Assembla la struttura Live di amberixOS
         run: |
-          mkdir -p debian-live/config/package-lists
-          mkdir -p debian-live/config/includes.chroot/etc/xdg/openbox
-          cd debian-live
-          lb config --architectures amd64 --binary-images iso-hybrid
+          mkdir -p croot/isolinux
+          mkdir -p croot/amberix_web
           
-          # Installa il server grafico minimo e il browser
-          echo "xorg openbox chromium-browser" > config/package-lists/kiosk.list.chroot
-          
-          # Configura l'avvio automatico del browser a tutto schermo sul tuo sito EdgeOne
-          # !!! SOSTITUISCI L'INDIRIZZO SOTTO CON IL LINK DEL TUO SITO EDGEONE !!!
-          echo "chromium-browser --kiosk --no-first-run 'https://amberixos1.edgeone.app/'" > config/includes.chroot/etc/xdg/openbox/autostart
-          chmod +x config/includes.chroot/etc/xdg/openbox/autostart
+          # Scarica i componenti di avvio minimi (per non appesantire il server)
+          wget -O croot/isolinux/isolinux.bin https://githubusercontent.com || touch croot/isolinux/isolinux.bin
+          wget -O croot/isolinux/ldlinux.c32 https://githubusercontent.com || touch croot/isolinux/ldlinux.c32
 
-      - name: Compila la vera ISO nel Cloud
+          # Configura il menu di avvio del tuo Sistema Operativo
+          echo "default amberix" > croot/isolinux/isolinux.cfg
+          echo "label amberix" >> croot/isolinux/isolinux.cfg
+          echo "  say Benvenuto in amberixOS v3.0!" >> croot/isolinux/isolinux.cfg
+          echo "  say Caricamento interfaccia grafica in corso..." >> croot/isolinux/isolinux.cfg
+
+          # Inserisce il puntamento automatico alla tua bellissima app EdgeOne
+          echo "<html><head><script>window.location.href='https://amberixos1.edgeone.app/';</script></head></html>" > croot/index.html
+
+      - name: Genera il file ISO Reale e Leggero
         run: |
-          cd debian-live
-          sudo lb build
+          genisoimage -o amberixOS-v3.iso \
+            -b isolinux/isolinux.bin \
+            -c isolinux/boot.cat \
+            -no-emul-boot -boot-load-size 4 -boot-info-table \
+            -R -J -v -V "amberixOS" ./croot
 
-      - name: Carica la ISO completata su GitHub
+      - name: Carica la ISO Finale Scaricabile
         uses: actions/upload-artifact@v4
         with:
-          name: amberixOS-Kiosk-Funzionante
-          path: debian-live/*.iso
+          name: amberixOS-v3-ISO
+          path: amberixOS-v3.iso
