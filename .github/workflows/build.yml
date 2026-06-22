@@ -1,37 +1,40 @@
-name: Compila VERO amberixOS Kiosk
+name: Compila ISO Ufficiale amberixOS
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-kiosk-iso:
     runs-on: ubuntu-latest
     steps:
       - name: Sincronizza codice
         uses: actions/checkout@v4
 
-      - name: Installa pacchetti di sistema reali
+      - name: Installa strumenti ufficiali Ubuntu Live
         run: |
           sudo apt-get update
-          sudo apt-get install -y squashfs-tools xorriso bzip2 genisoimage
+          sudo apt-get install -y binutils debootstrap live-build xorriso squashfs-tools
 
-      - name: Costruisci il Kernel e il File System Reale
+      - name: Configura il sistema Kiosk
         run: |
-          # Scarica il motore Linux Live Kit (usato da Slax Linux)
-          git clone https://github.com
-          mkdir -p iso_dir/boot
-          mkdir -p iso_dir/changes
+          mkdir kiosk-build && cd kiosk-build
+          lb config --binary-images iso-hybrid --architectures amd64 --distribution jammy --archive-areas "main universe"
+          
+          # Inserisce i programmi necessari: Server Grafico, Gestore finestre leggero e il Browser
+          mkdir -p config/package-lists
+          echo "xorg openbox chromium-browser" > config/package-lists/kiosk.list.chroot
           
           # Configura l'avvio automatico a tutto schermo su amberixOS
-          mkdir -p iso_dir/root/.config/openbox
-          echo "chromium --kiosk --no-first-run 'https://edgeone.app'" > iso_dir/root/.config/openbox/autostart
-          
-          # Genera la struttura dati reale (Questo richiederà circa 3-4 minuti)
-          # I server di GitHub scaricano i pezzi mancanti a 1000 Mbps
-          cd linux-live-kit
-          ./build
+          mkdir -p config/includes.chroot/etc/xdg/openbox
+          echo "chromium-browser --kiosk --no-first-run --disable-infobars 'https://edgeone.app'" > config/includes.chroot/etc/xdg/openbox/autostart
+          chmod +x config/includes.chroot/etc/xdg/openbox/autostart
 
-      - name: Carica la ISO Reale (Dovrà pesare circa 200-300 MB)
+      - name: Compila la ISO nel Cloud (Richiede circa 8-10 minuti)
+        run: |
+          cd kiosk-build
+          sudo lb build
+
+      - name: Carica il file ISO reale su GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: amberixOS-v3-VERA
-          path: /tmp/livekit-x86_64.iso
+          name: amberixOS-v3.0-Official-ISO
+          path: kiosk-build/*.iso
