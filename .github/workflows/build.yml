@@ -3,7 +3,7 @@ name: Build WebOS ISO
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Ti permette di avviare il processo anche manualmente
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,22 +16,32 @@ jobs:
     - name: Installazione strumenti di compilazione ISO
       run: |
         sudo apt-get update
-        sudo apt-get install -y xorriso squashfs-tools genisoimage
+        sudo apt-get install -y xorriso squashfs-tools genisoimage syslinux isolinux
 
-    - name: Configurazione ambiente Live Boot
+    - name: Configurazione ambiente Live Boot e File di Avvio
       run: |
         mkdir -p iso_root/live
         mkdir -p iso_root/isolinux
         
-        # Scarica un kernel Linux minimale e un file-system di base (esempio concettuale)
-        # In un ambiente reale, qui viene iniettato il browser in modalità Kiosk con il tuo HTML
-        echo "Configurazione del sistema operativo con Kiosk Mode per HTML..."
+        # Copia i file di boot reali di Isolinux installati nel sistema Ubuntu di GitHub
+        cp /usr/lib/ISOLINUX/isolinux.bin iso_root/isolinux/
+        cp /usr/lib/syslinux/modules/bios/ldlinux.c32 iso_root/isolinux/
+        
+        # Se il tuo file non si chiama index.html, rinominalo in automatico qui
+        # (Sostituisci "il_tuo_file.html" con il nome reale se necessario)
+        if [ -f "il_tuo_file.html" ]; then mv il_tuo_file.html index.html; fi
+        
+        # Copia il tuo codice HTML e i file associati nella cartella live
         cp -r * iso_root/live/ 2>/dev/null || true
+        
+        # Crea una configurazione di boot minimale per isolinux
+        echo "default live" > iso_root/isolinux/isolinux.cfg
+        echo "label live" >> iso_root/isolinux/isolinux.cfg
+        echo "  say Avvio del tuo WebOS in corso..." >> iso_root/isolinux/isolinux.cfg
 
     - name: Generazione File ISO
       run: |
-        # Genera l'immagine ISO avviabile standard
-        genisoimage -R -b isolinux/isolinux.bin -c isolinux/boot.cat \
+        genisoimage -R -J -b isolinux/isolinux.bin -c isolinux/boot.cat \
           -no-emul-boot -boot-load-size 4 -boot-info-table \
           -o webos-system.iso iso_root
 
